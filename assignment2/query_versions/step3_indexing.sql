@@ -1,3 +1,5 @@
+use assignment2;
+
 CREATE INDEX filtered_stds_idx ON students (Affects_Academic_Performance, Addicted_Score, Sleep_Hours_Per_Night);
 
 explain analyze
