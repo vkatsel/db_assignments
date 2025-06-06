@@ -1,7 +1,7 @@
 import mysql.connector
 import time
-from threading import Thread, Event
 
+# ---Made with help of code shown on Practical Training---
 # --- Database Connection Details ---
 DB_NAME = "assignment3"
 DB_USER = "root"
@@ -31,6 +31,10 @@ def get_connection(isolation_level_str: str):
             conn.autocommit = False  # Important for transactions
             conn.cmd_query(f"SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
             print(f"[INFO] Connection set to READ COMMITTED.")
+        elif isolation_level_str == "REPEATABLE READ":
+            conn.autocommit = False
+            conn.cmd_query(f"SET SESSION TRANSACTION ISOLATION LEVEL REPEATABLE READ;")
+            print(f"[INFO] Connection set to REPEATABLE READ.")
         else:
             raise ValueError(f"Unsupported isolation level: {isolation_level_str}")
         return conn
@@ -84,10 +88,9 @@ def reset_database():
 #Transaction 1 makes a change without commiting it. Transaction 2 Read uncommited change.
 #Isolation level is Read Uncommited for Transaction 2
 
-print("[INFO] Scenario 1: Dirty Read")
+print("\n[INFO] Scenario 1: Dirty Read\n")
 
-reset_database()
-conn_t1 = get_connection("READ COMMITTED")
+conn_t1 = get_connection("READ UNCOMMITTED")
 conn_t2 = get_connection("READ UNCOMMITTED")
 
 try:
@@ -105,10 +108,12 @@ try:
     print("\n[INFO] Transaction 1 (making a rollback):")
     conn_t1.rollback()
     fetch_status(conn_t1, "Anna")
-    
+except mysql.connector.Error as e:
+    print(f"[ERROR] {e}")
 finally:
     conn_t1.close()
     conn_t2.close()
+    reset_database()
 
 print("\n[✅] Dirty read scenario completed")
 
@@ -117,9 +122,8 @@ print("\n[✅] Dirty read scenario completed")
 #Transaction 1 reads the same status again, getting different result
 #Isolation level: both "READ COMMITED"
 
-print("\n[INFO] SCENARIO 2: NON-REPEATABLE READ")
+print("\n[INFO] SCENARIO 2: NON-REPEATABLE READ\n")
 
-reset_database()
 conn_t1 = get_connection("READ COMMITTED")
 conn_t2 = get_connection("READ COMMITTED")
 try:
@@ -134,13 +138,85 @@ try:
     conn_t2.commit()
     time.sleep(3)
 
-    print("\n[INFO] Transaction 1 (reading after a commit from unfinished transaction 2):")
+    print("\n[INFO] Transaction 1:")
     fetch_status(conn_t1, "Anna")
     time.sleep(3)
+except mysql.connector.Error as e:
+    print(f"[ERROR] {e}")
 finally:
     conn_t1.close()
     conn_t2.close()
     reset_database()
 
+print("\n[✅] Non-Repeatable read scenario completed")
+
+# ---Bonus Tasks---
+#Scenario 3: Repeatable Read
+#Shows the work of Scenario 2 with REPEATABLE READ level of isolation, making visible the difference
+print("\nScenario 3: Scenario but 2 with REPEATABLE READ level of isolation.\n")
+
+conn_t1 = get_connection("REPEATABLE READ")
+conn_t2 = get_connection("REPEATABLE READ")
+try:
+    print("\n[INFO] Transaction 1:")
+    conn_t1.start_transaction()
+    fetch_status(conn_t1, "Anna")
+    time.sleep(3)
+
+    print("\n[INFO] Transaction 2: ")
+    conn_t2.start_transaction()
+    update_status(conn_t2, "Anna", "Shipped")
+    conn_t2.commit()
+    time.sleep(3)
+
+    print("\n[INFO] Transaction 1: ")
+    fetch_status(conn_t1, "Anna")
+    time.sleep(3)
+
+    print("\nTransaction 1: ")
+    fetch_status(conn_t1, "Anna")
+    time.sleep(3)
+except mysql.connector.Error as e:
+    print(f"[ERROR] {e}")
+finally:
+    conn_t1.close()
+    conn_t2.close()
+    reset_database()
+
+print("\n[✅] Repeatable read scenario completed")
+
+#Scenario 4: Deadlock
+#Two transactions block each other while being executed concurrently
+
+print("\nScenario 4: Deadlock.\n")
+
+conn1 = get_connection("READ COMMITTED")
+conn2 = get_connection("READ COMMITTED")
+
+try:
+    print("\n[INFO] Transaction 1:")
+    conn1.start_transaction()
+    update_status(conn1, "Anna", "processing")
+    time.sleep(3)
+
+    print("\n[INFO] Transaction 2:")
+    conn2.start_transaction()
+    update_status(conn2, "Mark", "shipped")
+    time.sleep(3)
+
+    print("\n[INFO] Transaction 1 trying to update Mark:")
+    update_status(conn1, "Mark", "processing")
+
+    print("\n[INFO] Transaction 2 trying to update Anna:")
+    update_status(conn2, "Anna", "shipped")
+
+except mysql.connector.Error as e:
+    print(f"[ERROR] {e}")
+finally:
+    conn1.close()
+    conn2.close()
+    reset_database()
+
+print("\n[✅] Deadlock scenario completed")
 
 
