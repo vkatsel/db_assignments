@@ -107,6 +107,9 @@ try:
     
     print("\n[INFO] Transaction 1 (making a rollback):")
     conn_t1.rollback()
+    time.sleep(3)
+
+    print("\n[INFO] Transaction 2:")
     fetch_status(conn_t1, "Anna")
 except mysql.connector.Error as e:
     print(f"[ERROR] {e}")
@@ -173,9 +176,6 @@ try:
     fetch_status(conn_t1, "Anna")
     time.sleep(3)
 
-    print("\nTransaction 1: ")
-    fetch_status(conn_t1, "Anna")
-    time.sleep(3)
 except mysql.connector.Error as e:
     print(f"[ERROR] {e}")
 finally:
@@ -218,5 +218,3 @@ finally:
     reset_database()
 
 print("\n[✅] Deadlock scenario completed")
-
-
